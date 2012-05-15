@@ -107,7 +107,7 @@ public class AsyncHttpResponseHandler {
      * Fired when a request returns successfully, override to handle in your own code
      * @param content the body of the HTTP response from the server
      */
-    public void onSuccess(String content) {}
+    public void onSuccess(HttpResponse response, String content) {}
 
     /**
      * Fired when a request fails to complete, override to handle in your own code
@@ -131,8 +131,8 @@ public class AsyncHttpResponseHandler {
     // Pre-processing of messages (executes in background threadpool thread)
     //
 
-    protected void sendSuccessMessage(String responseBody) {
-        sendMessage(obtainMessage(SUCCESS_MESSAGE, responseBody));
+    protected void sendSuccessMessage(HttpResponse response, String responseBody) {
+        sendMessage(obtainMessage(SUCCESS_MESSAGE, new Object[]{response, responseBody}));
     }
 
     protected void sendFailureMessage(Throwable e, String responseBody) {
@@ -152,8 +152,8 @@ public class AsyncHttpResponseHandler {
     // Pre-processing of messages (in original calling thread, typically the UI thread)
     //
 
-    protected void handleSuccessMessage(String responseBody) {
-        onSuccess(responseBody);
+    protected void handleSuccessMessage(HttpResponse response, String responseBody) {
+        onSuccess(response, responseBody);
     }
 
     protected void handleFailureMessage(Throwable e, String responseBody) {
@@ -164,13 +164,13 @@ public class AsyncHttpResponseHandler {
 
     // Methods which emulate android's Handler and Message methods
     protected void handleMessage(Message msg) {
+    	Object[] response = (Object[])msg.obj;
         switch(msg.what) {
             case SUCCESS_MESSAGE:
-                handleSuccessMessage((String)msg.obj);
+                handleSuccessMessage((HttpResponse)response[0], (String)response[1]);
                 break;
             case FAILURE_MESSAGE:
-                Object[] repsonse = (Object[])msg.obj;
-                handleFailureMessage((Throwable)repsonse[0], (String)repsonse[1]);
+                handleFailureMessage((Throwable)response[1], (String)response[2]);
                 break;
             case START_MESSAGE:
                 onStart();
@@ -220,7 +220,7 @@ public class AsyncHttpResponseHandler {
         if(status.getStatusCode() >= 300) {
             sendFailureMessage(new HttpResponseException(status.getStatusCode(), status.getReasonPhrase()), responseBody);
         } else {
-            sendSuccessMessage(responseBody);
+            sendSuccessMessage(response, responseBody);
         }
     }
 }

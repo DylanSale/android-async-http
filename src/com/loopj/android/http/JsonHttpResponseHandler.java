@@ -18,6 +18,7 @@
 
 package com.loopj.android.http;
 
+import org.apache.http.HttpResponse;
 import org.json.JSONArray;
 import org.json.JSONException;
 import org.json.JSONObject;
@@ -60,8 +61,8 @@ public class JsonHttpResponseHandler extends AsyncHttpResponseHandler {
 
     // Utility methods
     @Override
-    protected void handleSuccessMessage(String responseBody) {
-        super.handleSuccessMessage(responseBody);
+    protected void handleSuccessMessage(HttpResponse response, String responseBody) {
+        super.handleSuccessMessage(response, responseBody);
 
         try {
             Object jsonResponse = parseResponse(responseBody);
