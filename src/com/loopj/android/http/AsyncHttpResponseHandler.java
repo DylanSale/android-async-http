@@ -170,7 +170,7 @@ public class AsyncHttpResponseHandler {
                 handleSuccessMessage((HttpResponse)response[0], (String)response[1]);
                 break;
             case FAILURE_MESSAGE:
-                handleFailureMessage((Throwable)response[1], (String)response[2]);
+                handleFailureMessage((Throwable)response[0], (String)response[1]);
                 break;
             case START_MESSAGE:
                 onStart();
