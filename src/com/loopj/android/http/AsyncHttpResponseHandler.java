@@ -214,11 +214,13 @@ public class AsyncHttpResponseHandler {
                 responseBody = EntityUtils.toString(entity);
             }
         } catch(IOException e) {
-            sendFailureMessage(e, null);
+            sendFailureMessage(new Throwable("BufferedHttpEntity IO exception"), null);
         }
 
         if(status.getStatusCode() >= 300) {
-            sendFailureMessage(new HttpResponseException(status.getStatusCode(), status.getReasonPhrase()), responseBody);
+            //sendFailureMessage(new HttpResponseException(status.getStatusCode(), status.getReasonPhrase()), responseBody);
+        	String detailMessage = status.getStatusCode() + " - " + status.getReasonPhrase();
+        	sendFailureMessage(new Throwable(detailMessage), responseBody);
         } else {
             sendSuccessMessage(response, responseBody);
         }
