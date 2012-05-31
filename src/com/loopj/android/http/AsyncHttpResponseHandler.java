@@ -73,11 +73,14 @@ public class AsyncHttpResponseHandler {
     private static final int FINISH_MESSAGE = 3;
 
     private Handler handler;
-
+    private boolean convertResponseToString = true;
+    
     /**
      * Creates a new AsyncHttpResponseHandler
+     * @param convertResponseToString if this is false, the callbacks will be given null as the content string
+     * and you have to get the data from the response object's entity directly.
      */
-    public AsyncHttpResponseHandler() {
+    public AsyncHttpResponseHandler(boolean convertResponseToString) {
         // Set up a handler to post events back to the correct thread if possible
         if(Looper.myLooper() != null) {
             handler = new Handler(){
@@ -86,6 +89,11 @@ public class AsyncHttpResponseHandler {
                 }
             };
         }
+        this.convertResponseToString = convertResponseToString;
+    }
+    
+    public AsyncHttpResponseHandler() {
+    	this(true);
     }
 
 
@@ -116,14 +124,26 @@ public class AsyncHttpResponseHandler {
      */
     public void onFailure(Throwable error) {}
 
+ 
     /**
      * Fired when a request fails to complete, override to handle in your own code
      * @param error the underlying cause of the failure
+     * @param response the response returned from the server
      * @param content the response body, if any
      */
     public void onFailure(Throwable error, String content) {
         // By default, call the deprecated onFailure(Throwable) for compatibility
         onFailure(error);
+    }
+
+    /**
+     * Fired when a request fails to complete, override to handle in your own code
+     * @param error the underlying cause of the failure
+     * @param response the response returned from the server
+     * @param content the response body, if any
+     */
+    public void onFailure(Throwable error, HttpResponse response, String content) {
+    	onFailure(error, content);
     }
 
 
@@ -135,8 +155,8 @@ public class AsyncHttpResponseHandler {
         sendMessage(obtainMessage(SUCCESS_MESSAGE, new Object[]{response, responseBody}));
     }
 
-    protected void sendFailureMessage(Throwable e, String responseBody) {
-        sendMessage(obtainMessage(FAILURE_MESSAGE, new Object[]{e, responseBody}));
+    protected void sendFailureMessage(Throwable e, HttpResponse response, String responseBody) {
+        sendMessage(obtainMessage(FAILURE_MESSAGE, new Object[]{e, response, responseBody}));
     }
 
     protected void sendStartMessage() {
@@ -156,8 +176,8 @@ public class AsyncHttpResponseHandler {
         onSuccess(response, responseBody);
     }
 
-    protected void handleFailureMessage(Throwable e, String responseBody) {
-        onFailure(e, responseBody);
+    protected void handleFailureMessage(Throwable e, HttpResponse response, String responseBody) {
+        onFailure(e, response, responseBody);
     }
 
 
@@ -170,7 +190,7 @@ public class AsyncHttpResponseHandler {
                 handleSuccessMessage((HttpResponse)response[0], (String)response[1]);
                 break;
             case FAILURE_MESSAGE:
-                handleFailureMessage((Throwable)response[0], (String)response[1]);
+                handleFailureMessage((Throwable)response[0], (HttpResponse)response[1], (String)response[2]);
                 break;
             case START_MESSAGE:
                 onStart();
@@ -206,21 +226,23 @@ public class AsyncHttpResponseHandler {
     void sendResponseMessage(HttpResponse response) {
         StatusLine status = response.getStatusLine();
         String responseBody = null;
-        try {
-            HttpEntity entity = null;
-            HttpEntity temp = response.getEntity();
-            if(temp != null) {
-                entity = new BufferedHttpEntity(temp);
-                responseBody = EntityUtils.toString(entity, "UTF-8");
-            }
-        } catch(IOException e) {
-            sendFailureMessage(new Throwable("BufferedHttpEntity IO exception"), null);
+        if(convertResponseToString) {
+	        try {
+	            HttpEntity entity = null;
+	            HttpEntity temp = response.getEntity();
+	            if(temp != null) {
+	                entity = new BufferedHttpEntity(temp);
+	                responseBody = EntityUtils.toString(entity, "UTF-8");
+	            }
+	        } catch(IOException e) {
+	            sendFailureMessage(new Throwable("BufferedHttpEntity IO exception"), response, null);
+	        }
         }
-
+        
         if(status.getStatusCode() >= 300) {
             //sendFailureMessage(new HttpResponseException(status.getStatusCode(), status.getReasonPhrase()), responseBody);
         	String detailMessage = status.getStatusCode() + " - " + status.getReasonPhrase();
-        	sendFailureMessage(new Throwable(detailMessage), responseBody);
+        	sendFailureMessage(new Throwable(detailMessage), response, responseBody);
         } else {
             sendSuccessMessage(response, responseBody);
         }

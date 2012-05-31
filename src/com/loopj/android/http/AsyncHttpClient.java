@@ -490,7 +490,27 @@ public class AsyncHttpClient {
         if(headers != null) delete.setHeaders(headers);
         sendRequest(httpClient, httpContext, delete, null, responseHandler, context);
     }
+    
+    //HTTP Custom Request
+    
+    /**
+     * Perform a given Request
+     * @param request the custom request object to pass to the http client.
+     * @param responseHandler the response handler instance that should handle the response.
+     */
+    public void request(HttpUriRequest request, AsyncHttpResponseHandler responseHandler) {
+    	request(null, request, responseHandler);
+    }
 
+    /**
+     * Perform a given Request
+     * @param context the Android Context which initiated the request.
+     * @param request the custom request object to pass to the http client.
+     * @param responseHandler the response handler instance that should handle the response.
+     */
+    public void request(Context context, HttpUriRequest request, AsyncHttpResponseHandler responseHandler) {
+    	sendRequest(httpClient, httpContext, request, null, responseHandler, context);
+    }
 
     // Private stuff
     private void sendRequest(DefaultHttpClient client, HttpContext httpContext, HttpUriRequest uriRequest, String contentType, AsyncHttpResponseHandler responseHandler, Context context) {

@@ -55,7 +55,7 @@ class AsyncHttpRequest implements Runnable {
         } catch (IOException e) {
             if(responseHandler != null) {
                 responseHandler.sendFinishMessage();
-                responseHandler.sendFailureMessage(new Throwable(e.toString()), null);
+                responseHandler.sendFailureMessage(new Throwable(e.toString()), null, null);
             }
         }
     }
