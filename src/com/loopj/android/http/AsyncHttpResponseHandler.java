@@ -18,7 +18,12 @@
 
 package com.loopj.android.http;
 
+import java.io.File;
+import java.io.FileOutputStream;
+import java.io.FileWriter;
 import java.io.IOException;
+import java.io.InputStream;
+import java.io.OutputStream;
 
 import org.apache.http.HttpEntity;
 import org.apache.http.HttpResponse;
@@ -73,14 +78,14 @@ public class AsyncHttpResponseHandler {
     private static final int FINISH_MESSAGE = 3;
 
     private Handler handler;
-    private boolean convertResponseToString = true;
+    private File saveContentToFile = null;
     
     /**
      * Creates a new AsyncHttpResponseHandler
      * @param convertResponseToString if this is false, the callbacks will be given null as the content string
      * and you have to get the data from the response object's entity directly.
      */
-    public AsyncHttpResponseHandler(boolean convertResponseToString) {
+    public AsyncHttpResponseHandler(File saveContentToFile) {
         // Set up a handler to post events back to the correct thread if possible
         if(Looper.myLooper() != null) {
             handler = new Handler(){
@@ -89,11 +94,11 @@ public class AsyncHttpResponseHandler {
                 }
             };
         }
-        this.convertResponseToString = convertResponseToString;
+        this.saveContentToFile = saveContentToFile;
     }
     
     public AsyncHttpResponseHandler() {
-    	this(true);
+    	this(null);
     }
 
 
@@ -117,6 +122,14 @@ public class AsyncHttpResponseHandler {
      */
     public void onSuccess(HttpResponse response, String content) {}
 
+    /**
+     * Fired when a request that was given a file to save the response to is successful
+     * @param response the response object
+     * @param responseFile the file that the response was saved to 
+     */
+    public void onSuccess(HttpResponse response, File responseFile) {}
+    
+    
     /**
      * Fired when a request fails to complete, override to handle in your own code
      * @param error the underlying cause of the failure
@@ -151,8 +164,8 @@ public class AsyncHttpResponseHandler {
     // Pre-processing of messages (executes in background threadpool thread)
     //
 
-    protected void sendSuccessMessage(HttpResponse response, String responseBody) {
-        sendMessage(obtainMessage(SUCCESS_MESSAGE, new Object[]{response, responseBody}));
+    protected void sendSuccessMessage(HttpResponse response, String responseBody, File saveContentToFile) {
+        sendMessage(obtainMessage(SUCCESS_MESSAGE, new Object[]{response, responseBody, saveContentToFile}));
     }
 
     protected void sendFailureMessage(Throwable e, HttpResponse response, String responseBody) {
@@ -172,11 +185,17 @@ public class AsyncHttpResponseHandler {
     // Pre-processing of messages (in original calling thread, typically the UI thread)
     //
 
-    protected void handleSuccessMessage(HttpResponse response, String responseBody) {
-        onSuccess(response, responseBody);
+    protected void handleSuccessMessage(HttpResponse response, String responseBody, File responseFile) {
+    	if(responseFile != null) {
+        	onSuccess(response, responseFile);
+    	}
+    	else 
+    	{
+    		onSuccess(response, responseBody);
+    	}
     }
 
-    protected void handleFailureMessage(Throwable e, HttpResponse response, String responseBody) {
+	protected void handleFailureMessage(Throwable e, HttpResponse response, String responseBody) {
         onFailure(e, response, responseBody);
     }
 
@@ -187,7 +206,7 @@ public class AsyncHttpResponseHandler {
     	Object[] response = (Object[])msg.obj;
         switch(msg.what) {
             case SUCCESS_MESSAGE:
-                handleSuccessMessage((HttpResponse)response[0], (String)response[1]);
+                handleSuccessMessage((HttpResponse)response[0], (String)response[1], (File)response[2]);
                 break;
             case FAILURE_MESSAGE:
                 handleFailureMessage((Throwable)response[0], (HttpResponse)response[1], (String)response[2]);
@@ -226,7 +245,7 @@ public class AsyncHttpResponseHandler {
     void sendResponseMessage(HttpResponse response) {
         StatusLine status = response.getStatusLine();
         String responseBody = null;
-        if(convertResponseToString) {
+        if(saveContentToFile == null) {
 	        try {
 	            HttpEntity entity = null;
 	            HttpEntity temp = response.getEntity();
@@ -237,6 +256,19 @@ public class AsyncHttpResponseHandler {
 	        } catch(IOException e) {
 	            sendFailureMessage(new Throwable("BufferedHttpEntity IO exception"), response, null);
 	        }
+        } else {
+        	try {
+	            HttpEntity entity = response.getEntity();
+	            if(entity != null) {
+	            	OutputStream outFileStream = new FileOutputStream(saveContentToFile);
+	            	entity.writeTo(outFileStream);
+	            	outFileStream.flush();
+	            	outFileStream.close();
+	            }
+        	}
+        	catch(IOException e) {
+	            sendFailureMessage(new Throwable("BufferedHttpEntity IO exception"), response, null);        		
+        	}
         }
         
         if(status.getStatusCode() >= 300) {
@@ -244,7 +276,7 @@ public class AsyncHttpResponseHandler {
         	String detailMessage = status.getStatusCode() + " - " + status.getReasonPhrase();
         	sendFailureMessage(new Throwable(detailMessage), response, responseBody);
         } else {
-            sendSuccessMessage(response, responseBody);
+            sendSuccessMessage(response, responseBody, saveContentToFile);
         }
     }
 }
